@@ -8,10 +8,8 @@ import javax.servlet.http.HttpServletRequest;
 @Controller
 public class Main {
 
-
-    /** 로그인 화면 **/
-    @RequestMapping(value = "test.do")
-    public String Login(HttpServletRequest req) throws Exception {
+    @RequestMapping(value = "postData.do")
+    public String postData(HttpServletRequest req) throws Exception {
 
 
         System.out.println("ignore test");
