@@ -14,7 +14,7 @@ public class Main {
     public String Login(HttpServletRequest req) throws Exception {
 
 
-        System.out.println("test");
+        System.out.println("ignore test");
 
         return "index";
     }
