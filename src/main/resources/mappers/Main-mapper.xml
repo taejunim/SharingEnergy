@@ -50,7 +50,17 @@
 
         SELECT TOP 1 MEASURE_DTTM
         FROM TB_OUT_DATA_5MINUTE
-        WHERE DEVICE_ID = '${orgGbnCd}${orgCd}${deviceGbnCd}${deviceId}'
+        WHERE 1=1
+        <choose>
+            <when test='deviceId != "" and deviceId != null'>
+                AND DEVICE_ID = '${orgGbnCd}${orgCd}${deviceGbnCd}${deviceId}'
+            </when>
+            <otherwise>
+                AND DEVICE_GBN_CD = '${deviceGbnCd}'
+                AND ORG_GBN_CD = '${orgGbnCd}'
+                AND ORG_CD = '${orgCd}'
+            </otherwise>
+        </choose>
         ORDER BY MEASURE_DTTM DESC
 
     </select>

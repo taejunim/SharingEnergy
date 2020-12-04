@@ -40,6 +40,13 @@ public class Main {
         String a = "2020-11-25 01:35";
         logger.info("a length: " + String.valueOf(a).length() );
 
+        String[] deviceArray = {"001", "004", "005"};
+
+        for (int i=0; i<deviceArray.length; i++) {
+
+            System.out.println(deviceArray[i]);
+        }
+
         return "index";
     }
 
@@ -182,13 +189,6 @@ public class Main {
         Map<String,Object> resultMap = new HashMap<String, Object>();
 
         try {
-
-            if (outsideDataObject.getDeviceId() == null || outsideDataObject.getDeviceId().equals("")) {
-                resultMap = makeResponseMap("E002", "fail", "요청 파라미터 오류 : deviceId 값 오류");
-                resultMap.put("outsideData", outsideDataObject);
-
-                return resultMap;
-            }
 
             if (outsideDataObject.getDeviceGbnCd() == null || outsideDataObject.getDeviceGbnCd().equals("")) {
                 resultMap = makeResponseMap("E002", "fail", "요청 파라미터 오류 : deviceGbnCd 값 오류");
