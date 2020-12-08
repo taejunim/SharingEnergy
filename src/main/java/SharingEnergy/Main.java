@@ -36,17 +36,7 @@ public class Main {
     public String test() {
 
         logger.info("test");
-
-        String a = "2020-11-25 01:35";
-        logger.info("a length: " + String.valueOf(a).length() );
-
-        String[] deviceArray = {"001", "004", "005"};
-
-        for (int i=0; i<deviceArray.length; i++) {
-
-            System.out.println(deviceArray[i]);
-        }
-
+        
         return "index";
     }
 

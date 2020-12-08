@@ -24,7 +24,25 @@ public interface MainMapper {
 
     int outsideDataInsert(ArrayList<OutsideDataObject> outsideDataList) throws Exception;
 
+    int outsideQuantumDataInsert(ArrayList<OutsideDataObject> outsideDataList) throws Exception;
+
     int errorLogInsert(ResponseObject responseObject) throws Exception;
 
     Map<String, Object> selectLatestData(OutsideDataObject outsideDataObject) throws Exception;
+
+    int deleteHourData() throws Exception;
+
+    int insertHourData() throws Exception;
+
+    int deleteDayData() throws Exception;
+
+    int insertDayData() throws Exception;
+
+    int deleteMonthData() throws Exception;
+
+    int insertMonthData() throws Exception;
+
+    int deleteYearData() throws Exception;
+
+    int insertYearData() throws Exception;
 }

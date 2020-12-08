@@ -20,7 +20,21 @@
                                     (
                                     '${item.orgGbnCd}${item.orgCd}${item.deviceGbnCd}${item.deviceId}'
                                     , '${item.deviceGbnCd}'
-                                    , '${item.chgrGbnCd}'
+                                    <choose>
+
+                                        <when test='item.chgrGbnCd == "001" and item.orgCd == "0020002"'>
+                                        , '002'
+                                        </when>
+                                        <when test='item.chgrGbnCd == "002" and item.orgCd == "0020002"'>
+                                        , '001'
+                                        </when>
+                                        <when test='item.deviceGbnCd == "005" and item.orgCd == "0010002"'>
+                                        , '002'
+                                        </when>
+                                        <otherwise>
+                                        , '${item.chgrGbnCd}'
+                                        </otherwise>
+                                    </choose>
                                     , '${item.measureDttm}'
                                     , ${item.actElecPwr}
                                     , ${item.actElecEnergy}
@@ -28,6 +42,44 @@
                                     , '${item.orgCd}'
                                     )
                                 </foreach>
+
+    </insert>
+
+    <insert id="outsideQuantumDataInsert" parameterType="java.util.List">
+
+        INSERT INTO TB_OUT_DATA_5MINUTE (
+            DEVICE_ID
+            , DEVICE_GBN_CD
+            , CHGR_GBN_CD
+            , MEASURE_DTTM
+            , ACT_ELEC_PWR
+            , ACT_ELEC_ENERGY
+            , ORG_GBN_CD
+            , ORG_CD
+            )
+        VALUES
+        <foreach collection="list" item="item" separator=" , ">
+            (
+            '0010010002${item.deviceGbnCd}${item.deviceGbnCd}'
+            , '${item.deviceGbnCd}'
+            <choose>
+                <when test='item.deviceGbnCd == "001"'>
+                    , '001'
+                </when>
+                <when test='item.deviceGbnCd == "005"'>
+                    , '002'
+                </when>
+                <otherwise>
+                    , '${item.chgrGbnCd}'
+                </otherwise>
+            </choose>
+            , '${item.measureDttm}'
+            , 0.0
+            , ${item.actElecEnergy}
+            , '001'
+            , '0010002'
+            )
+        </foreach>
 
     </insert>
 
@@ -62,6 +114,234 @@
             </otherwise>
         </choose>
         ORDER BY MEASURE_DTTM DESC
+
+    </select>
+    
+    <update id="deleteHourData">
+
+        DELETE FROM TB_DT
+          FROM TB_OUT_DATA_HOUR AS TB_DT
+         WHERE EXISTS
+            (SELECT TB_CP.*
+               FROM (
+                     SELECT A.DEVICE_ID
+                          , A.DEVICE_GBN_CD
+                          , A.ORG_GBN_CD
+                          , A.CHGR_GBN_CD
+                          , A.ORG_CD
+                          , CONVERT(DATETIME, CONVERT(VARCHAR(13), A.MEASURE_DTTM,120)+':00:00') AS C_HOUR --시간까지 가져왔을때 다시 DATETIME으로 변환 시 오류가 나기 때문에 시간 형식을 맞춰줌 YYYYMMDD HH + :00(분):00(초)
+                          , A.ACT_ELEC_PWR
+                          , A.ACT_ELEC_ENERGY
+                       FROM TB_OUT_DATA_5MINUTE A
+                          , (SELECT DEVICE_ID
+                                  , CHGR_GBN_CD      ------------------------------------------
+                                  , MAX(MEASURE_DTTM) MT        --5분 데이블에서 장비아이디별 최종 인서트 일자 가져옴--
+                               FROM TB_OUT_DATA_5MINUTE         --                                      --
+                              GROUP BY DEVICE_ID, CHGR_GBN_CD   ------------------------------------------
+                             ) B
+                      WHERE A.DEVICE_ID = B.DEVICE_ID     --장비아이디, 측정일자기준, 비교조건 가져옴--
+                        AND A.CHGR_GBN_CD = B.CHGR_GBN_CD
+                        AND A.MEASURE_DTTM = B.MT
+                    ) AS TB_CP
+              WHERE TB_DT.DEVICE_ID = TB_CP.DEVICE_ID
+                AND TB_DT.HOUR_MEASURE_DTTM = TB_CP.C_HOUR  --핵심 조건절 임
+                AND TB_DT.CHGR_GBN_CD = TB_CP.CHGR_GBN_CD
+            );
+
+    </update>
+
+    <update id="insertHourData">
+
+        insert TB_OUT_DATA_HOUR(
+             DEVICE_ID           --장비아이디
+             , DEVICE_GBN_CD       --장비구분
+             , ORG_GBN_CD          --기관구분
+             , CHGR_GBN_CD         --충전구분
+             , ORG_CD              --기관코드
+             , HOUR_MEASURE_DTTM   --측정시
+             , ACT_ELEC_PWR        --전압
+             , ACT_ELEC_ENERGY     --전력
+        )
+        select A.DEVICE_ID
+             , A.DEVICE_GBN_CD
+             , A.ORG_GBN_CD
+             , A.CHGR_GBN_CD
+             , A.ORG_CD
+             , convert(datetime, convert(varchar(13), A.MEASURE_DTTM,120)+':00:00')
+             , A.ACT_ELEC_PWR
+             , A.ACT_ELEC_ENERGY
+          from TB_OUT_DATA_5MINUTE A
+             , (select DEVICE_ID
+                     , CHGR_GBN_CD      ------------------------------------------
+                     , max(MEASURE_DTTM) mt        --5분 데이블에서 장비아이디별 최종 인서트 일자 가져옴--
+                  from TB_OUT_DATA_5MINUTE         --                                      --
+                 group by DEVICE_ID, CHGR_GBN_CD
+               ) B
+         where A.DEVICE_ID = B.DEVICE_ID
+           and A.CHGR_GBN_CD = B.CHGR_GBN_CD
+           and A.MEASURE_DTTM = B.mt
+         order by
+               A.Measure_DTTM desc
+
+    </update>
+
+    <update id="deleteDayData">
+
+        delete from TB_DT
+        from TB_OUT_DATA_DAY as TB_DT
+        where exists
+          (select TB_CP.*
+           from
+               (
+                   select A.DEVICE_ID
+                        , A.DEVICE_GBN_CD
+                        , A.CHGR_GBN_CD
+                        , A.HOUR_MEASURE_DTTM as C_HOUR
+                        , B.mt
+                   from TB_OUT_DATA_HOUR A
+                      , (select DEVICE_ID
+                              , CHGR_GBN_CD
+                              , max(HOUR_MEASURE_DTTM) mt
+                         from TB_OUT_DATA_HOUR
+                         group by DEVICE_ID, CHGR_GBN_CD
+                   ) B
+                   where A.DEVICE_ID = B.DEVICE_ID
+                     and A.CHGR_GBN_CD = B.CHGR_GBN_CD
+                     and A.HOUR_MEASURE_DTTM = B.mt
+               ) as TB_CP
+           where TB_DT.DEVICE_ID = TB_CP.DEVICE_ID
+             and convert(varchar, TB_DT.DAY_MEASURE_DTTM, 102) = convert(varchar, TB_CP.C_HOUR, 102)  --핵심 조건절 임
+             and TB_DT.CHGR_GBN_CD = TB_CP.CHGR_GBN_CD
+          )
+
+    </update>
+
+    <update id="insertDayData">
+
+        insert TB_OUT_DATA_DAY
+             ( DEVICE_ID           --장비아이디
+             , DEVICE_GBN_CD       --장비구분
+             , ORG_GBN_CD          --기관구분
+             , CHGR_GBN_CD         --충전구분
+             , ORG_CD              --기관코드
+             , DAY_MEASURE_DTTM   --측정시
+             , ACT_ELEC_PWR        --전압
+             , ACT_ELEC_ENERGY     --전력
+             )
+        select A.DEVICE_ID
+             , A.DEVICE_GBN_CD
+             , A.ORG_GBN_CD
+             , A.CHGR_GBN_CD
+             , A.ORG_CD
+             , convert(datetime, convert(varchar, A.HOUR_MEASURE_DTTM,102))
+             , A.ACT_ELEC_PWR
+             , A.ACT_ELEC_ENERGY
+          from TB_OUT_DATA_HOUR A
+             , (select DEVICE_ID
+                     , CHGR_GBN_CD
+                     , max(HOUR_MEASURE_DTTM) mt
+                  from TB_OUT_DATA_HOUR
+                 group by DEVICE_ID, CHGR_GBN_CD
+                ) B
+          where A.DEVICE_ID = B.device_id
+            and A.CHGR_GBN_CD = B.CHGR_GBN_CD
+            and A.HOUR_MEASURE_DTTM = B.mt
+          order by
+                A.HOUR_MEASURE_DTTM desc;
+
+    </update>
+
+    <update id="deleteMonthData">
+
+        delete from TB_DT
+          from TB_OUT_DATA_MONTH as TB_DT
+         where exists (select TB_CP.*
+                         from (select A.DEVICE_ID
+                                    , A.CHGR_GBN_CD
+                                    , convert(datetime, convert(varchar(7), A.DAY_MEASURE_DTTM,102)+'.01') as C_DAY
+                                 from TB_OUT_DATA_DAY A
+                                group by  A.DEVICE_ID, A.CHGR_GBN_CD, convert(datetime, convert(varchar(7), A.DAY_MEASURE_DTTM,102)+'.01')
+                               ) as TB_CP
+                        where TB_DT.DEVICE_ID = TB_CP.DEVICE_ID
+                          and convert(varchar(7), TB_DT.MONTH_MEASURE_DTTM, 102) = convert(varchar(7), TB_CP.C_DAY, 102)  --핵심 조건절 임
+                          and TB_DT.CHGR_GBN_CD = TB_CP.CHGR_GBN_CD
+                       )
+    </update>
+
+    <update id="insertMonthData">
+
+        insert TB_OUT_DATA_MONTH
+             ( DEVICE_ID           --장비아이디
+             , DEVICE_GBN_CD       --장비구분
+             , ORG_GBN_CD          --기관구분
+             , CHGR_GBN_CD         --충전구분
+             , ORG_CD              --기관코드
+             , MONTH_MEASURE_DTTM   --측정시
+             , ACT_ELEC_PWR        --전압
+             , ACT_ELEC_ENERGY     --전력
+             )
+        select A.DEVICE_ID
+             , A.DEVICE_GBN_CD
+             , A.ORG_GBN_CD
+             , A.CHGR_GBN_CD
+             , A.ORG_CD
+             , convert(datetime, convert(varchar(7), A.DAY_MEASURE_DTTM,102)+'.01')
+             --년 테이블 인서트는 convert(datetime, convert(varchar(4), A.MONTH_MEASURE_DTTM,102)+'.01')
+             , sum(A.ACT_ELEC_PWR) --일별값의 합계를 계산하여야한다
+             , sum(A.ACT_ELEC_ENERGY) --일별값의 합계를 계산하여야 한다
+          from TB_OUT_DATA_DAY A
+         group by  A.DEVICE_ID     , A.DEVICE_GBN_CD     , A.ORG_GBN_CD     , A.CHGR_GBN_CD     , A.ORG_CD     ,  convert(datetime, convert(varchar(7), A.DAY_MEASURE_DTTM,102)+'.01');
+
+    </update>
+
+    <update id="deleteYearData">
+
+        delete from TB_DT
+          from TB_OUT_DATA_YEAR as TB_DT
+        where exists
+                  (select TB_CP.*
+                   from
+                       (select A.DEVICE_ID
+                                , A.CHGR_GBN_CD
+                                , convert(datetime, concat(convert(varchar(4), A.MONTH_MEASURE_DTTM,102), '-01-01 00:00:00')) as C_MONTH
+                           from TB_OUT_DATA_MONTH A
+                           group by  A.DEVICE_ID, A.CHGR_GBN_CD, convert(datetime, concat(convert(varchar(4), A.MONTH_MEASURE_DTTM,102), '-01-01 00:00:00'))
+                       ) as TB_CP
+                   where TB_DT.DEVICE_ID = TB_CP.DEVICE_ID
+                     and convert(varchar(7), TB_DT.YEAR_MEASURE_DTTM, 102) = convert(varchar(7), TB_CP.C_MONTH, 102)  --핵심 조건절 임
+                     and TB_DT.CHGR_GBN_CD = TB_CP.CHGR_GBN_CD
+                      )
+
+    </update>
+
+    <update id="insertYearData">
+
+        insert TB_OUT_DATA_YEAR
+            ( DEVICE_ID           --장비아이디
+            , DEVICE_GBN_CD       --장비구분
+            , ORG_GBN_CD          --기관구분
+            , CHGR_GBN_CD         --충전구분
+            , ORG_CD              --기관코드
+            , YEAR_MEASURE_DTTM   --측정시
+            , ACT_ELEC_PWR        --전압
+            , ACT_ELEC_ENERGY     --전력
+            )
+        select A.DEVICE_ID
+             , A.DEVICE_GBN_CD
+             , A.ORG_GBN_CD
+             , A.CHGR_GBN_CD
+             , A.ORG_CD
+             , convert(datetime, concat(convert(varchar(4), A.MONTH_MEASURE_DTTM,102), '-01-01 00:00:00'))
+             --년 테이블 인서트는 convert(datetime, convert(varchar(4), A.MONTH_MEASURE_DTTM,102)+'.01')
+             , sum(A.ACT_ELEC_PWR) --일별값의 합계를 계산하여야한다
+             , sum(A.ACT_ELEC_ENERGY) --일별값의 합계를 계산하여야 한다
+          from TB_OUT_DATA_MONTH A
+         group by A.DEVICE_ID, A.DEVICE_GBN_CD, A.ORG_GBN_CD, A.CHGR_GBN_CD, A.ORG_CD, convert(datetime, concat(convert(varchar(4), A.MONTH_MEASURE_DTTM,102), '-01-01 00:00:00'));
+
+    </update>
+
+    <select id="testSelect">
+
 
     </select>
 
