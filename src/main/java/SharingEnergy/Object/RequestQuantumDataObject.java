@@ -7,6 +7,6 @@ public class RequestQuantumDataObject {
 
     private String deviceGbnCd;
     private String chgrGbnCd;
-    private String startDttm;
+    private String endDttm;
 }
 

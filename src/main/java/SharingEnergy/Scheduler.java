@@ -73,13 +73,13 @@ public class Scheduler {
 
             ArrayList<RequestQuantumDataObject> requestQuantumDataObjectArrayList = new ArrayList<RequestQuantumDataObject>();
 
-            long startDate = System.currentTimeMillis();
-            String startDttm = simpleDateFormat.format(startDate);
+            long endDate = System.currentTimeMillis();
+            String endDttm = simpleDateFormat.format(endDate);
 
             for (int i=0; i<deviceArray.length; i++) {
 
                 RequestQuantumDataObject requestQuantumDataObject = new RequestQuantumDataObject();
-                requestQuantumDataObject.setStartDttm(startDttm);
+                requestQuantumDataObject.setEndDttm(endDttm);
 
                 //PV
                 if (deviceArray[i].equals("001")) {
