@@ -156,7 +156,62 @@ public class Main {
 
         responseObject.outsideDataList = outsideDataList;
 
+        insertSummaryData();
+
         return responseObject;
+    }
+
+    //Summary Data Insert
+    private void insertSummaryData() {
+
+        MainMapper maintenanceMapper = sqlSession.getMapper(MainMapper.class);
+
+        try {
+
+            //시간별 데이터
+            int deleteHourResult = maintenanceMapper.deleteHourData();
+            int insertHourResult = maintenanceMapper.insertHourData();
+
+            logger.info("deleteHourResult : " + deleteHourResult);
+            logger.info("insertHourResult : " + insertHourResult);
+
+            //일별 데이터
+            int deleteDayResult = maintenanceMapper.deleteDayData();
+            int insertDayResult = maintenanceMapper.insertDayData();
+
+            logger.info("deleteDayResult : " + deleteDayResult);
+            logger.info("insertDayResult : " + insertDayResult);
+
+            //월별 데이터
+            int deleteMonthResult = maintenanceMapper.deleteMonthData();
+            int insertMonthResult = maintenanceMapper.insertMonthData();
+
+            logger.info("deleteMonthResult : " + deleteMonthResult);
+            logger.info("insertMonthResult : " + insertMonthResult);
+
+            //년별 데이터
+            int deleteYearResult = maintenanceMapper.deleteYearData();
+            int insertYearResult = maintenanceMapper.insertYearData();
+
+            logger.info("deleteYearResult : " + deleteYearResult);
+            logger.info("insertYearResult : " + insertYearResult);
+        } catch (Exception e) {
+            e.printStackTrace();
+            logger.info("[ Summary Data Insert Exception Cause : " + e.getCause());
+            logger.info("[ Summary Data Insert Exception Message : " + e.getMessage());
+            logger.info("[ Summary Data Insert Exception StackTrace : " + e.getStackTrace());
+
+            ResponseObject responseObject = makeResponseObject("E999", "fail", "Summary Data 작업 오류");
+
+            responseObject.dataList = "";
+
+            try {
+                mainService.errorLogInsert(responseObject);
+            } catch (Exception exceptionOfException) {
+                exceptionOfException.printStackTrace();
+                logger.info("[ Summary Data Insert Exception Exception - Exception ]");
+            }
+        }
     }
 
     private ResponseObject makeResponseObject(String code, String result, String message) {
