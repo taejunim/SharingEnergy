@@ -6,7 +6,7 @@
 
     <bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
         <property name="driverClassName" value="com.microsoft.sqlserver.jdbc.SQLServerDriver"/>
-        <property name="url" value="jdbc:sqlserver://db-mssql2019.cgvlbn6mu0wg.ap-northeast-2.rds.amazonaws.com:1433;database=JEJU"/>
+        <property name="url" value="jdbc:sqlserver://211.253.37.107:1433;database=JEJU"/>
         <property name="username" value="jeju_user"/>
         <property name="password" value="##jeju!!10"/>
     </bean>
