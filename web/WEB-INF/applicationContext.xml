@@ -6,9 +6,9 @@
 
     <bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
         <property name="driverClassName" value="com.microsoft.sqlserver.jdbc.SQLServerDriver"/>
-        <property name="url" value="jdbc:sqlserver://211.253.37.107:1433;database=JEJU"/>
-        <property name="username" value="jeju_user"/>
-        <property name="password" value="##jeju!!10"/>
+        <property name="url" value="jdbc:sqlserver://101.101.218.126:1433;database=Sharing_Energy"/>
+        <property name="username" value="metis"/>
+        <property name="password" value="metisInfo2010!"/>
     </bean>
 
     <!-- Mysql <-> Mybatis를 연결해주는 객체 -->
