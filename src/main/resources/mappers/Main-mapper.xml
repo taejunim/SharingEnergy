@@ -1,348 +1,191 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="SharingEnergy.OutsideData.service.impl.MainMapper">
+<mapper namespace="SharingEnergy.MainMapper">
 
-    <insert id="outsideDataInsert" parameterType="java.util.List">
 
-        INSERT INTO TB_OUT_DATA_5MINUTE (
-                                        DEVICE_ID
-                                        , DEVICE_GBN_CD
-                                        , CHGR_GBN_CD
-                                        , MEASURE_DTTM
-                                        , ACT_ELEC_PWR
-                                        , ACT_ELEC_ENERGY
-                                        , ORG_GBN_CD
-                                        , ORG_CD
-                                        )
-                                VALUES
-                                <foreach collection="list" item="item" separator=" , ">
-                                    (
-                                    '${item.orgGbnCd}${item.orgCd}${item.deviceGbnCd}${item.deviceId}'
-                                    , '${item.deviceGbnCd}'
-                                    <choose>
 
-                                        <when test='item.chgrGbnCd == "001" and item.orgCd == "0020002"'>
-                                        , '002'
-                                        </when>
-                                        <when test='item.chgrGbnCd == "002" and item.orgCd == "0020002"'>
-                                        , '001'
-                                        </when>
-                                        <when test='item.deviceGbnCd == "005" and item.orgCd == "0010002"'>
-                                        , '002'
-                                        </when>
-                                        <otherwise>
-                                        , '${item.chgrGbnCd}'
-                                        </otherwise>
-                                    </choose>
-                                    , '${item.measureDttm}'
-                                    , ${item.actElecPwr}
-                                    , ${item.actElecEnergy}
-                                    , '${item.orgGbnCd}'
-                                    , '${item.orgCd}'
-                                    )
-                                </foreach>
 
-    </insert>
+    <!-- EDSM에 등록된 AMI중, DB에도 저장된 값 찾기 -->
+    <select id="getRegisterAmi" parameterType="HashMap" resultType="kepcoAmi">
+        SELECT a.ami_idx amiIdx,
+        a.mid     meterNo,
+        b.custNo  custNo
+        FROM tb_ami a,
+        (
+        <foreach collection="list" index="index" item="item" separator="UNION ALL">
+            SELECT #{item.meterNo} AS meterNo , #{item.custNo} AS custNo
+        </foreach>
+        ) b
+        WHERE mid IN (
+        <foreach collection="list" index="index" item="item" separator=",">
+            #{item.meterNo}
+        </foreach>
+        )
+        AND a.mid = b.meterNo
+    </select>
 
-    <insert id="outsideQuantumDataInsert" parameterType="java.util.List">
-
-        INSERT INTO TB_OUT_DATA_5MINUTE (
-            DEVICE_ID
-            , DEVICE_GBN_CD
-            , CHGR_GBN_CD
-            , MEASURE_DTTM
-            , ACT_ELEC_PWR
-            , ACT_ELEC_ENERGY
-            , ORG_GBN_CD
-            , ORG_CD
-            )
+    <!-- 한전 AMI 15분 데이터 등록 -->
+    <insert id="insertAmi15MinuteData" parameterType="kepcoAmi">
+        INSERT INTO tb_kepco_15m(
+        metering_date,
+        hhmm,
+        ami_idx,
+        use_type,
+        reg_dt,
+        mid,
+        kepco_cstmr_no,
+        metering_val,
+        accmlt_metering_val
+        )
         VALUES
-        <foreach collection="list" item="item" separator=" , ">
+        <foreach collection="list" index="index" item="item" separator=",">
             (
-            '0010010002${item.deviceGbnCd}${item.deviceGbnCd}'
-            , '${item.deviceGbnCd}'
+            #{item.meteringDate},
+            #{item.meteringTime},
+            #{item.amiIdx},
+            '1',
+            sysdate(),
+            #{item.meterNo},
+            #{item.custNo},
+            #{item.meteringVal},
             <choose>
-                <when test='item.deviceGbnCd == "001"'>
-                    , '001'
-                </when>
-                <when test='item.deviceGbnCd == "005"'>
-                    , '002'
+                <when test="item.accmltMeteringVal != null and item.accmltMeteringVal != ''">
+                    #{item.accmltMeteringVal}
                 </when>
                 <otherwise>
-                    , '${item.chgrGbnCd}'
+                    IFNULL((SELECT accmlt_metering_val FROM (SELECT MAX(accmlt_metering_val) AS accmlt_metering_val FROM tb_kepco_15m WHERE ami_idx = #{item.amiIdx}) AS a), 0)
                 </otherwise>
             </choose>
-            , '${item.measureDttm}'
-            , 0.0
-            , ${item.actElecEnergy}
-            , '001'
-            , '0010002'
             )
         </foreach>
-
     </insert>
 
-    <insert id="errorLogInsert" parameterType="responseObject">
-
-        INSERT INTO TB_OUT_DATA_ERROR_LOG (
-                                        ERROR_CD
-                                        , ERROR_MESSAGE
-                                        , DATA_LIST
-                                        )
-                                VALUES (
-                                        #{code}
-                                        , #{message}
-                                        , #{dataList}
-                                      )
-
-    </insert>
-
-    <select id="selectLatestData" parameterType="outsideDataObject" resultType="HashMap">
-
-        SELECT TOP 1 MEASURE_DTTM
-        FROM TB_OUT_DATA_5MINUTE
-        WHERE 1=1
-        <choose>
-            <when test='deviceId != "" and deviceId != null'>
-                AND DEVICE_ID = '${orgGbnCd}${orgCd}${deviceGbnCd}${deviceId}'
-            </when>
-            <otherwise>
-                AND DEVICE_GBN_CD = '${deviceGbnCd}'
-                AND ORG_GBN_CD = '${orgGbnCd}'
-                AND ORG_CD = '${orgCd}'
-            </otherwise>
-        </choose>
-        ORDER BY MEASURE_DTTM DESC
-
-    </select>
-    
-    <update id="deleteHourData">
-
-        DELETE FROM TB_DT
-          FROM TB_OUT_DATA_HOUR AS TB_DT
-         WHERE EXISTS
-            (SELECT TB_CP.*
-               FROM (
-                     SELECT A.DEVICE_ID
-                          , A.DEVICE_GBN_CD
-                          , A.ORG_GBN_CD
-                          , A.CHGR_GBN_CD
-                          , A.ORG_CD
-                          , CONVERT(DATETIME, CONVERT(VARCHAR(13), A.MEASURE_DTTM,120)+':00:00') AS C_HOUR --시간까지 가져왔을때 다시 DATETIME으로 변환 시 오류가 나기 때문에 시간 형식을 맞춰줌 YYYYMMDD HH + :00(분):00(초)
-                          , A.ACT_ELEC_PWR
-                          , A.ACT_ELEC_ENERGY
-                       FROM TB_OUT_DATA_5MINUTE A
-                          , (SELECT DEVICE_ID
-                                  , CHGR_GBN_CD      ------------------------------------------
-                                  , MAX(MEASURE_DTTM) MT        --5분 데이블에서 장비아이디별 최종 인서트 일자 가져옴--
-                               FROM TB_OUT_DATA_5MINUTE         --                                      --
-                              GROUP BY DEVICE_ID, CHGR_GBN_CD   ------------------------------------------
-                             ) B
-                      WHERE A.DEVICE_ID = B.DEVICE_ID     --장비아이디, 측정일자기준, 비교조건 가져옴--
-                        AND A.CHGR_GBN_CD = B.CHGR_GBN_CD
-                        AND A.MEASURE_DTTM = B.MT
-                    ) AS TB_CP
-              WHERE TB_DT.DEVICE_ID = TB_CP.DEVICE_ID
-                AND TB_DT.HOUR_MEASURE_DTTM = TB_CP.C_HOUR  --핵심 조건절 임
-                AND TB_DT.CHGR_GBN_CD = TB_CP.CHGR_GBN_CD
-            );
-
-    </update>
-
-    <update id="insertHourData">
-
-        insert TB_OUT_DATA_HOUR(
-             DEVICE_ID           --장비아이디
-             , DEVICE_GBN_CD       --장비구분
-             , ORG_GBN_CD          --기관구분
-             , CHGR_GBN_CD         --충전구분
-             , ORG_CD              --기관코드
-             , HOUR_MEASURE_DTTM   --측정시
-             , ACT_ELEC_PWR        --전압
-             , ACT_ELEC_ENERGY     --전력
+    <!-- 한전 AMI 한시간 데이터 등록 -->
+    <insert id="insertAmiHourData" parameterType="kepcoAmi">
+        INSERT INTO tb_kepco_hour(
+        metering_date,
+        hh,
+        ami_idx,
+        use_type,
+        reg_dt,
+        mid,
+        kepco_cstmr_no,
+        metering_val,
+        accmlt_metering_val
         )
-        select A.DEVICE_ID
-             , A.DEVICE_GBN_CD
-             , A.ORG_GBN_CD
-             , A.CHGR_GBN_CD
-             , A.ORG_CD
-             , convert(datetime, convert(varchar(13), A.MEASURE_DTTM,120)+':00:00')
-             , A.ACT_ELEC_PWR
-             , A.ACT_ELEC_ENERGY
-          from TB_OUT_DATA_5MINUTE A
-             , (select DEVICE_ID
-                     , CHGR_GBN_CD      ------------------------------------------
-                     , max(MEASURE_DTTM) mt        --5분 데이블에서 장비아이디별 최종 인서트 일자 가져옴--
-                  from TB_OUT_DATA_5MINUTE         --                                      --
-                 group by DEVICE_ID, CHGR_GBN_CD
-               ) B
-         where A.DEVICE_ID = B.DEVICE_ID
-           and A.CHGR_GBN_CD = B.CHGR_GBN_CD
-           and A.MEASURE_DTTM = B.mt
-         order by
-               A.Measure_DTTM desc
-
-    </update>
-
-    <update id="deleteDayData">
-
-        delete from TB_DT
-        from TB_OUT_DATA_DAY as TB_DT
-        where exists
-          (select TB_CP.*
-           from
-               (
-                   select A.DEVICE_ID
-                        , A.DEVICE_GBN_CD
-                        , A.CHGR_GBN_CD
-                        , A.HOUR_MEASURE_DTTM as C_HOUR
-                        , B.mt
-                   from TB_OUT_DATA_HOUR A
-                      , (select DEVICE_ID
-                              , CHGR_GBN_CD
-                              , max(HOUR_MEASURE_DTTM) mt
-                         from TB_OUT_DATA_HOUR
-                         group by DEVICE_ID, CHGR_GBN_CD
-                   ) B
-                   where A.DEVICE_ID = B.DEVICE_ID
-                     and A.CHGR_GBN_CD = B.CHGR_GBN_CD
-                     and A.HOUR_MEASURE_DTTM = B.mt
-               ) as TB_CP
-           where TB_DT.DEVICE_ID = TB_CP.DEVICE_ID
-             and convert(varchar, TB_DT.DAY_MEASURE_DTTM, 102) = convert(varchar, TB_CP.C_HOUR, 102)  --핵심 조건절 임
-             and TB_DT.CHGR_GBN_CD = TB_CP.CHGR_GBN_CD
-          )
-
-    </update>
-
-    <update id="insertDayData">
-
-        insert TB_OUT_DATA_DAY
-             ( DEVICE_ID           --장비아이디
-             , DEVICE_GBN_CD       --장비구분
-             , ORG_GBN_CD          --기관구분
-             , CHGR_GBN_CD         --충전구분
-             , ORG_CD              --기관코드
-             , DAY_MEASURE_DTTM   --측정시
-             , ACT_ELEC_PWR        --전압
-             , ACT_ELEC_ENERGY     --전력
-             )
-        select A.DEVICE_ID
-             , A.DEVICE_GBN_CD
-             , A.ORG_GBN_CD
-             , A.CHGR_GBN_CD
-             , A.ORG_CD
-             , convert(datetime, convert(varchar, A.HOUR_MEASURE_DTTM,102))
-             , A.ACT_ELEC_PWR
-             , A.ACT_ELEC_ENERGY
-          from TB_OUT_DATA_HOUR A
-             , (select DEVICE_ID
-                     , CHGR_GBN_CD
-                     , max(HOUR_MEASURE_DTTM) mt
-                  from TB_OUT_DATA_HOUR
-                 group by DEVICE_ID, CHGR_GBN_CD
-                ) B
-          where A.DEVICE_ID = B.device_id
-            and A.CHGR_GBN_CD = B.CHGR_GBN_CD
-            and A.HOUR_MEASURE_DTTM = B.mt
-          order by
-                A.HOUR_MEASURE_DTTM desc;
-
-    </update>
-
-    <update id="deleteMonthData">
-
-        delete from TB_DT
-          from TB_OUT_DATA_MONTH as TB_DT
-         where exists (select TB_CP.*
-                         from (select A.DEVICE_ID
-                                    , A.CHGR_GBN_CD
-                                    , convert(datetime, convert(varchar(7), A.DAY_MEASURE_DTTM,102)+'.01') as C_DAY
-                                 from TB_OUT_DATA_DAY A
-                                group by  A.DEVICE_ID, A.CHGR_GBN_CD, convert(datetime, convert(varchar(7), A.DAY_MEASURE_DTTM,102)+'.01')
-                               ) as TB_CP
-                        where TB_DT.DEVICE_ID = TB_CP.DEVICE_ID
-                          and convert(varchar(7), TB_DT.MONTH_MEASURE_DTTM, 102) = convert(varchar(7), TB_CP.C_DAY, 102)  --핵심 조건절 임
-                          and TB_DT.CHGR_GBN_CD = TB_CP.CHGR_GBN_CD
-                       )
-    </update>
-
-    <update id="insertMonthData">
-
-        insert TB_OUT_DATA_MONTH
-             ( DEVICE_ID           --장비아이디
-             , DEVICE_GBN_CD       --장비구분
-             , ORG_GBN_CD          --기관구분
-             , CHGR_GBN_CD         --충전구분
-             , ORG_CD              --기관코드
-             , MONTH_MEASURE_DTTM   --측정시
-             , ACT_ELEC_PWR        --전압
-             , ACT_ELEC_ENERGY     --전력
-             )
-        select A.DEVICE_ID
-             , A.DEVICE_GBN_CD
-             , A.ORG_GBN_CD
-             , A.CHGR_GBN_CD
-             , A.ORG_CD
-             , convert(datetime, convert(varchar(7), A.DAY_MEASURE_DTTM,102)+'.01')
-             --년 테이블 인서트는 convert(datetime, convert(varchar(4), A.MONTH_MEASURE_DTTM,102)+'.01')
-             , sum(A.ACT_ELEC_PWR) --일별값의 합계를 계산하여야한다
-             , sum(A.ACT_ELEC_ENERGY) --일별값의 합계를 계산하여야 한다
-          from TB_OUT_DATA_DAY A
-         group by  A.DEVICE_ID     , A.DEVICE_GBN_CD     , A.ORG_GBN_CD     , A.CHGR_GBN_CD     , A.ORG_CD     ,  convert(datetime, convert(varchar(7), A.DAY_MEASURE_DTTM,102)+'.01');
-
-    </update>
-
-    <update id="deleteYearData">
-
-        delete from TB_DT
-          from TB_OUT_DATA_YEAR as TB_DT
-        where exists
-                  (select TB_CP.*
-                   from
-                       (select A.DEVICE_ID
-                                , A.CHGR_GBN_CD
-                                , convert(datetime, concat(convert(varchar(4), A.MONTH_MEASURE_DTTM,102), '-01-01 00:00:00')) as C_MONTH
-                           from TB_OUT_DATA_MONTH A
-                           group by  A.DEVICE_ID, A.CHGR_GBN_CD, convert(datetime, concat(convert(varchar(4), A.MONTH_MEASURE_DTTM,102), '-01-01 00:00:00'))
-                       ) as TB_CP
-                   where TB_DT.DEVICE_ID = TB_CP.DEVICE_ID
-                     and convert(varchar(7), TB_DT.YEAR_MEASURE_DTTM, 102) = convert(varchar(7), TB_CP.C_MONTH, 102)  --핵심 조건절 임
-                     and TB_DT.CHGR_GBN_CD = TB_CP.CHGR_GBN_CD
-                      )
-
-    </update>
-
-    <update id="insertYearData">
-
-        insert TB_OUT_DATA_YEAR
-            ( DEVICE_ID           --장비아이디
-            , DEVICE_GBN_CD       --장비구분
-            , ORG_GBN_CD          --기관구분
-            , CHGR_GBN_CD         --충전구분
-            , ORG_CD              --기관코드
-            , YEAR_MEASURE_DTTM   --측정시
-            , ACT_ELEC_PWR        --전압
-            , ACT_ELEC_ENERGY     --전력
+        SELECT *
+        FROM (
+        <foreach collection="list" index="index" item="item" separator="UNION ALL">
+            (
+            SELECT
+            DATE_FORMAT(DATE_ADD(DATE_FORMAT(CONCAT( #{item.meteringDate}, #{item.meteringTime},'00'),'%Y%m%d%H%i%s'), INTERVAL -15 MINUTE ),'%Y%m%d'),
+            DATE_FORMAT(DATE_ADD(DATE_FORMAT(CONCAT( #{item.meteringDate}, #{item.meteringTime},'00'),'%Y%m%d%H%i%s'), INTERVAL -15 MINUTE),'%H'),
+            #{item.amiIdx},
+            '1',
+            sysdate(),
+            #{item.meterNo},
+            #{item.custNo},
+            #{item.meteringVal} AS meteringVal,
+            <choose>
+                <when test="item.accmltMeteringVal != null and item.accmltMeteringVal != ''">
+                    #{item.accmltMeteringVal} AS accmltMeteringVal
+                </when>
+                <otherwise>
+                    IFNULL((SELECT accmlt_metering_val
+                    FROM (SELECT MAX(accmlt_metering_val) AS accmlt_metering_val
+                    FROM tb_kepco_15m WHERE ami_idx = #{item.amiIdx} AND use_type = '1') AS a), #{item.meteringVal}
+                    ) AS accmltMeteringVal
+                </otherwise>
+            </choose>
             )
-        select A.DEVICE_ID
-             , A.DEVICE_GBN_CD
-             , A.ORG_GBN_CD
-             , A.CHGR_GBN_CD
-             , A.ORG_CD
-             , convert(datetime, concat(convert(varchar(4), A.MONTH_MEASURE_DTTM,102), '-01-01 00:00:00'))
-             --년 테이블 인서트는 convert(datetime, convert(varchar(4), A.MONTH_MEASURE_DTTM,102)+'.01')
-             , sum(A.ACT_ELEC_PWR) --일별값의 합계를 계산하여야한다
-             , sum(A.ACT_ELEC_ENERGY) --일별값의 합계를 계산하여야 한다
-          from TB_OUT_DATA_MONTH A
-         group by A.DEVICE_ID, A.DEVICE_GBN_CD, A.ORG_GBN_CD, A.CHGR_GBN_CD, A.ORG_CD, convert(datetime, concat(convert(varchar(4), A.MONTH_MEASURE_DTTM,102), '-01-01 00:00:00'));
+        </foreach>
+        ) AS A
 
-    </update>
+        ON DUPLICATE KEY UPDATE
+        metering_val = metering_val + meteringVal,
+        accmlt_metering_val = accmltMeteringVal
+    </insert>
 
-    <select id="testSelect">
+    <!-- 한전 AMI 하루 데이터 등록 -->
+    <insert id="insertAmiDayData" parameterType="kepcoAmi">
+        INSERT INTO tb_kepco_day(
+        metering_date,
+        ami_idx,
+        use_type,
+        reg_dt,
+        mid,
+        kepco_cstmr_no,
+        metering_val,
+        accmlt_metering_val
+        )
+        SELECT *
+        FROM (
+        <foreach collection="list" index="index" item="item" separator="UNION ALL">
+            (
+            SELECT
+            DATE_FORMAT(DATE_ADD(DATE_FORMAT(CONCAT( #{item.meteringDate}, #{item.meteringTime},'00'),'%Y%m%d%H%i%s'), INTERVAL -15 MINUTE ),'%Y%m%d'),
+            #{item.amiIdx},
+            '1',
+            sysdate(),
+            #{item.meterNo},
+            #{item.custNo},
+            #{item.meteringVal} AS meteringVal,
+            <choose>
+                <when test="item.accmltMeteringVal != null and item.accmltMeteringVal != ''">
+                    #{item.accmltMeteringVal} AS accmltMeteringVal
+                </when>
+                <otherwise>
+                    IFNULL((SELECT accmlt_metering_val
+                    FROM (SELECT MAX(accmlt_metering_val) AS accmlt_metering_val
+                    FROM tb_kepco_hour WHERE ami_idx = #{item.amiIdx} AND use_type = '1') AS a), #{item.meteringVal}
+                    ) AS accmltMeteringVal
+                </otherwise>
+            </choose>
+            )
+        </foreach>
+        ) AS A
+
+        ON DUPLICATE KEY UPDATE
+        metering_val = metering_val + meteringVal,
+        accmlt_metering_val = accmltMeteringVal
+    </insert>
 
 
-    </select>
+
+
+    <!-- 날씨 데이터 insert -->
+    <insert id="insertWeatherData" parameterType="WeatherInterface">
+        INSERT into tb_weather_api
+        ( reg_dt
+        , base_date
+        , base_time
+        , nx
+        , ny
+        , sky
+        , temp
+        , reh
+        , rn1
+        , wsd
+        , sunrise
+        , sunset
+        , pm10
+        )
+            VALUE
+            ( current_timestamp
+            , #{baseDate}
+            , #{baseTime}
+            , #{nx}
+            , #{ny}
+            , #{sky}
+            , #{temp}
+            , #{reh}
+            , #{rn1}
+            , #{wsd}
+            , #{sunrise}
+            , #{sunset}
+            , #{pm10}
+            )
+    </insert>
 
 </mapper>

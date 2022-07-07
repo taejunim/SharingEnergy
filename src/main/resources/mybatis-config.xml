@@ -12,7 +12,9 @@
     <typeAliases>
         <typeAlias alias="String" type="java.lang.String"/>
         <typeAlias alias="int" type="java.lang.Integer"/>
-        <typeAlias alias="outsideDataObject" type="SharingEnergy.Object.OutsideDataObject"/>
-        <typeAlias alias="responseObject" type="SharingEnergy.Object.ResponseObject"/>
+
+
+        <typeAlias alias="kepcoAmi" type="SharingEnergy.Object.KepcoAmi"/>
+        <typeAlias alias="WeatherInterface" type="SharingEnergy.Object.WeatherInterface"/>
     </typeAliases>
 </configuration>
