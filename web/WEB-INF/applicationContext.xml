@@ -7,7 +7,7 @@
     <bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
         <property name="driverClassName" value="com.microsoft.sqlserver.jdbc.SQLServerDriver"/>
         <property name="url" value="jdbc:sqlserver://101.101.218.126:1433;database=Sharing_Energy"/>
-        <property name="username" value="metis"/>
+        <property name="username" value="sa"/>
         <property name="password" value="metisInfo2010!"/>
     </bean>
 

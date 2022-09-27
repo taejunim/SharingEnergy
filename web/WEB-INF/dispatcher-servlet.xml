@@ -21,10 +21,10 @@
 <!--    <task:scheduler id="jobScheduler" pool-size="10" />-->
 <!--    <task:annotation-driven scheduler="jobScheduler" />-->
 
-    <bean id="scheduleService" class="SharingEnergy.Scheduler" />
+    <!--<bean id="scheduleService" class="SharingEnergy.Scheduler" />
     <task:scheduler id="gsScheduler" pool-size="10" />
     <task:executor id="gsTaskExecutor" pool-size="10" />
-    <task:annotation-driven executor="gsTaskExecutor" scheduler="gsScheduler" />
+    <task:annotation-driven executor="gsTaskExecutor" scheduler="gsScheduler" />-->
 
     <bean class="org.springframework.web.servlet.view.InternalResourceViewResolver">
         <property name="prefix" value="/WEB-INF/"/>
